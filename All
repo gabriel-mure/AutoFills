@@ -1,0 +1,891 @@
+# -*- coding: utf-8 -*-
+"""
+Spyder Editor
+
+This is a temporary script file.
+"""
+import customtkinter as ctk
+import tkinter
+import tkinter.messagebox
+import customtkinter
+import pandas as pd
+from PIL import Image
+from customtkinter import CTkImage
+import re
+import win32com.client as win32
+from datetime import datetime
+import pandas as pd
+import smtplib
+import openpyxl
+import pyperclip
+import os
+from reportlab.platypus import Paragraph
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.colors import HexColor
+
+
+
+
+customtkinter.set_appearance_mode("Dark") 
+customtkinter.set_default_color_theme("dark-blue") 
+
+
+# Obtenir le chemin absolu du répertoire courant
+base_dir = os.path.dirname(os.path.abspath(__file__))
+print(base_dir)
+# Construire le chemin du fichier Excel relatif au répertoire courant
+file_path = os.path.join(base_dir, "MailAdress.xlsx")
+df = pd.read_excel(file_path)
+
+# Sélectionner les adresses email des traders HSBC
+hsbc_emails = df['HSBC'].dropna().tolist()
+bnp_emails = df['BNP'].dropna().tolist()
+citi_emails = df['CITI'].dropna().tolist()
+jpm_emails = df['JPM'].dropna().tolist()
+medio_emails = df['MEDIO'].dropna().tolist()
+ml_emails = df['ML'].dropna().tolist()
+
+ms_emails = df['MS'].dropna().tolist()
+nomura_emails = df['NOMURA'].dropna().tolist()
+ubs_emails = df['UBS'].dropna().tolist()
+unicredit_emails = df['UNICREDIT'].dropna().tolist()
+
+cibc_emails = df['CIBC'].dropna().tolist()
+gs_emails = df['GS'].dropna().tolist()
+barclays_emails = df['BARCLAYS'].dropna().tolist()
+rbc_emails = df['RBC'].dropna().tolist()
+
+
+Banques = ["", "Goldman Sachs International","JP Morgan"]
+Trader = ["","Oriol Lozano"]
+Underlying = ["S&P 500 Index (CBOE)","VIX CBOE SPX VOL","S&P 500 Weeklys (OOH)"]
+
+
+
+
+class InputDialog(ctk.CTkToplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("Saisie des Paramètres")
+        self.geometry("300x550")
+        self.grab_set()
+        
+        current_date = datetime.now().strftime("%d %b %Y")
+        # Initialisation des variables
+        self.client_name = None
+        self.trader_name = None
+        self.trade_date = None
+        self.trade_ref = None
+        self.underlying = None
+        self.commission = None
+        
+        # Label et Entry pour le nom du client
+        self.client_name_label = ctk.CTkLabel(self, text="Client Name", fg_color="transparent",font=("Helvetica", 15,"italic"),text_color="#0c2f45")
+        self.client_name_label.pack(pady=(10, 5))
+        self.client_name_entry = ctk.CTkComboBox(self, values = Banques)
+        self.client_name_entry.pack(pady=(0, 10))
+        
+        # Label et Entry pour le nom du trader
+        self.trader_name_label = ctk.CTkLabel(self, text="Trader Name", fg_color="transparent",font=("Helvetica", 15,"italic"),text_color="#0c2f45")
+        self.trader_name_label.pack(pady=(10, 5))
+        self.trader_name_entry = ctk.CTkComboBox(self, values = Trader)
+        self.trader_name_entry.pack(pady=(0, 10))
+        
+        # Label et Entry pour la date du trade
+        self.trade_date_label = ctk.CTkLabel(self, text="Trade Date", fg_color="transparent",font=("Helvetica", 15,"italic"),text_color="#0c2f45")
+        self.trade_date_label.pack(pady=(10, 5))
+        self.trade_date_entry = ctk.CTkEntry(self)
+        self.trade_date_entry.pack(pady=(0, 10))
+        self.trade_date_entry.insert(0, current_date)
+        
+        # Label et Entry pour la référence du trade
+        self.trade_ref_label = ctk.CTkLabel(self, text="Trade Reference", fg_color="transparent",font=("Helvetica", 15,"italic"),text_color="#0c2f45")
+        self.trade_ref_label.pack(pady=(10, 5))
+        self.trade_ref_entry = ctk.CTkEntry(self)
+        self.trade_ref_entry.pack(pady=(0, 10))
+        self.trade_ref_entry.insert(0, "STR00069")
+        
+        # Label et Entry pour l'underlying
+        self.underlying_label = ctk.CTkLabel(self, text="Underlying", fg_color="transparent",font=("Helvetica", 15,"italic"),text_color="#0c2f45")
+        self.underlying_label.pack(pady=(10, 5))
+        self.underlying_entry = ctk.CTkComboBox(self, values = Underlying)
+        self.underlying_entry.pack(pady=(0, 10))
+        
+        # Label et Entry pour la commission
+        self.commission_label = ctk.CTkLabel(self, text="Commission", fg_color="transparent",font=("Helvetica", 15,"italic"),text_color="#0c2f45")
+        self.commission_label.pack(pady=(10, 5))
+        self.commission_entry = ctk.CTkEntry(self)
+        self.commission_entry.pack(pady=(0, 10))
+        
+        # Bouton pour valider et fermer la boîte de dialogue
+        self.ok_button = ctk.CTkButton(self, text="OK", command=self.on_ok)
+        self.ok_button.pack(pady=(20, 10))
+
+
+    def on_ok(self):
+        
+        # Récupère les valeurs saisies
+        self.client_name = self.client_name_entry.get()
+        self.trader_name = self.trader_name_entry.get()
+        self.trade_date = self.trade_date_entry.get()
+        self.trade_ref = self.trade_ref_entry.get()
+        self.underlying = self.underlying_entry.get()
+        self.commission = self.commission_entry.get()
+        self.destroy()  # Ferme la boîte de dialogue
+        
+
+
+
+
+class App(customtkinter.CTk):
+    def __init__(self):
+        super().__init__()
+
+
+       
+        self.geometry(f"{1100}x{600}")
+
+        # configure grid layout (4x4)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure((2, 3), weight=0)
+        self.grid_rowconfigure((0, 1, 2), weight=1)
+        self.title("AutoFills")
+
+
+        self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0,fg_color='#0c2f45')
+        self.sidebar_frame.grid(row=0, column=0, rowspan=4, sticky="nsew")
+        self.sidebar_frame.grid_rowconfigure(4, weight=1)
+       
+
+        my_image = customtkinter.CTkImage(light_image=Image.open("Vantage-Capital-Markets-Logo-768x372-1.png"),
+                                          dark_image=Image.open("Vantage-Capital-Markets-Logo-768x372-1.png"),
+                                          size=(160, 90))  # Remplacez par les chemins réels et la taille désirée
+       
+        image_label = customtkinter.CTkLabel(self.sidebar_frame, image=my_image, text="")
+        image_label.grid(row=0, column=0, padx=0, pady=(0, 230))
+
+        self.appearance_mode_label = customtkinter.CTkLabel(self.sidebar_frame, text="", anchor="w")
+        self.appearance_mode_label.grid(row=5, column=0, padx=20, pady=(10, 0))
+        self.appearance_mode_optionemenu = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Light", "Dark", "System"],
+                                                                       command=self.change_appearance_mode_event) 
+        #self.appearance_mode_optionemenu.grid(row=6, column=0, padx=20, pady=(10, 10))
+        self.cvc_visible = False
+        self.string_visible = False
+        self.conf_visible = False
+
+
+        self.affichecvc = customtkinter.CTkButton(self.sidebar_frame, text="Call V Call or Put V Put", fg_color="transparent",font=("Helvetica", 15,"italic"),command=self.affiche_cvc)
+        self.affichecvc.grid(row=0, column=0, padx=5, pady=5)
+
+        self.affichecvc = customtkinter.CTkButton(self.sidebar_frame, text="US Strings / Fills", fg_color="transparent",font=("Helvetica", 15,"italic"),command=self.affiche_string)
+        self.affichecvc.grid(row=2, column=0, padx=15, pady=15)
+        
+        
+        self.afficheconf = customtkinter.CTkButton(self.sidebar_frame, text="Confirmations", fg_color="transparent",font=("Helvetica", 15,"italic"),command=self.affiche_conf)
+        self.afficheconf.grid(row=3, column=0, padx=15, pady=15)
+        
+
+        self.affichenot = customtkinter.CTkButton(self.sidebar_frame, text="About", fg_color="transparent",font=("Helvetica", 15,"italic"), command=self.about)
+        self.affichenot.grid(row=5, column=0, padx=15, pady=15)
+        
+        
+        
+        self.tcbutton = customtkinter.CTkButton(master=self, text="Transform & Copy",font=("Helvetica", 15,"italic"),command=self.transform)
+
+       
+        self.receiv_inputs = customtkinter.CTkComboBox(master=self, values=Banques)
+
+
+        
+
+
+        self.button_send = customtkinter.CTkButton(master=self, border_width=2, text_color=("gray10", "#DCE4EE"), text="SEND",command=self.calcul,fg_color='#0c2f45')
+
+        
+        self.scrollable_frame = customtkinter.CTkScrollableFrame(self, label_text="Clients",fg_color = '#0c2f45')
+
+        self.slider_progressbar_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        
+        
+
+
+ 
+        
+
+
+        
+        
+        self.textbox = customtkinter.CTkTextbox(master=self, width=2,height=200)
+        
+        self.textboxoutput = customtkinter.CTkTextbox(master=self, width=1,height=10)
+
+       
+        
+       
+        self.slider_progressbar_frame.grid_columnconfigure(0, weight=1)
+        self.slider_progressbar_frame.grid_rowconfigure(4, weight=1)
+       
+        self.seg_button_1 = customtkinter.CTkSegmentedButton(self.slider_progressbar_frame)
+        self.seg_button_1.grid(row=0, column=0, padx=(20, 10), pady=(10, 10), sticky="ew")
+       
+        self.appearance_mode_label = customtkinter.CTkLabel(self.slider_progressbar_frame, text="Writting example : 20Jun25 SX5E/NKY 90% PVP qEUR 0.85/0.87%", anchor="w",text_color="#0c2f45")
+        self.appearance_mode_label.configure(font=("Segoe UI", 16,"italic"))
+        self.appearance_mode_label.grid(row=3, column=0, padx=20, pady=(10, 0))
+        
+
+        self.progressbar_2 = customtkinter.CTkProgressBar(self.slider_progressbar_frame)
+        self.progressbar_2.grid(row=2, column=0, padx=(20, 10), pady=(10, 10), sticky="ew")
+       
+
+        self.cvc_entry = customtkinter.CTkEntry(
+             self.slider_progressbar_frame,
+             placeholder_text="Description",
+
+         )
+
+        self.cvc_entry.grid(row=2, column=0, padx=(20, 10), pady=(10, 10), sticky="ew")
+
+        
+        self.switchiNOMURA = customtkinter.CTkSwitch(master=self.scrollable_frame, text="NOMURA")
+        #self.switchiNOMURA.configure(fg_color="red")  # Changer la couleur du texte en rouge
+        self.switchiNOMURA.grid(row=0, column=0, padx=10, pady=(0, 20))
+        
+        
+        self.switchiHSBC = customtkinter.CTkSwitch(master=self.scrollable_frame, text="HSBC")
+        self.switchiHSBC.grid(row=1, column=0, padx=10, pady=(0, 20))
+        
+        
+        self.switchiBNP = customtkinter.CTkSwitch(master=self.scrollable_frame, text="BNP")
+        self.switchiBNP.grid(row=2, column=0, padx=10, pady=(0, 20))
+        
+        self.switchiCITI = customtkinter.CTkSwitch(master=self.scrollable_frame, text="CITI")
+        self.switchiCITI.grid(row=3, column=0, padx=10, pady=(0, 20))
+
+
+        self.switchiMEDIO = customtkinter.CTkSwitch(master=self.scrollable_frame, text="MEDIO")
+        #self.switchi.configure(text_color="red")  # Changer la couleur du texte en rouge
+        self.switchiMEDIO.grid(row=4, column=0, padx=10, pady=(0, 20))
+        
+        self.switchiBARCLAYS = customtkinter.CTkSwitch(master=self.scrollable_frame, text="BARCLAYS")
+        self.switchiBARCLAYS.grid(row=5, column=0, padx=10, pady=(0, 20))
+
+        
+        
+        self.switchiGS = customtkinter.CTkSwitch(master=self.scrollable_frame, text="GS")
+        self.switchiGS.grid(row=6, column=0, padx=10, pady=(0, 20))
+        
+        
+        self.switchiML = customtkinter.CTkSwitch(master=self.scrollable_frame, text="ML")
+        self.switchiML.grid(row=7, column=0, padx=10, pady=(0, 20))
+
+
+        self.switchiJPM = customtkinter.CTkSwitch(master=self.scrollable_frame, text="JPM")
+        self.switchiJPM.grid(row=8, column=0, padx=10, pady=(0, 20))
+        
+        
+        self.switchiUBS = customtkinter.CTkSwitch(master=self.scrollable_frame, text="UBS")
+        self.switchiUBS.grid(row=9, column=0, padx=10, pady=(0, 20))
+        
+
+
+        self.switchiRBC = customtkinter.CTkSwitch(master=self.scrollable_frame, text="RBC")
+        self.switchiRBC.grid(row=11, column=0, padx=10, pady=(0, 20))
+        
+        self.switchiCIBC = customtkinter.CTkSwitch(master=self.scrollable_frame, text="CIBC")
+        self.switchiCIBC.grid(row=12, column=0, padx=10, pady=(0, 20))
+
+
+        self.switchiUNICREDIT = customtkinter.CTkSwitch(master=self.scrollable_frame, text="UNICREDIT")
+        self.switchiUNICREDIT.grid(row=13, column=0, padx=10, pady=(0, 20))
+
+        self.switchiMS = customtkinter.CTkSwitch(master=self.scrollable_frame, text="MS")
+        self.switchiMS.grid(row=14, column=0, padx=10, pady=(0, 20))
+
+
+        self.textbox.insert("0.0", "")
+        self.seg_button_1.configure(values=[ "Call v Call", "Put v Put"])
+        
+        
+        
+    def hide_all_widgets(self):
+        self.scrollable_frame.grid_forget()
+        self.button_send.grid_forget()
+        self.slider_progressbar_frame.grid_forget()
+        self.textbox.grid_forget()
+        self.textboxoutput.grid_forget()
+        
+
+        self.tcbutton.grid_forget()
+        self.receiv_inputs.grid_forget()
+
+    def affiche_string(self):
+        self.string_visible = not self.string_visible
+    
+        if self.string_visible:
+            self.hide_all_widgets()
+            self.textbox.configure(font=("Segoe UI", 14, "italic"))
+            self.textbox.grid(row=0, column=1, padx=100, pady=(50, 50), sticky="nsew")
+            self.textboxoutput.configure(font=("Segoe UI", 14, "italic"))
+            self.textboxoutput.grid(row=2, column=1, padx=100, pady=(50, 50), sticky="nsew")
+            self.tcbutton.grid(row=1, column=1, padx=15, pady=15)
+        else:
+            self.hide_all_widgets()
+    
+        self.cvc_visible = False
+
+    
+    def affiche_cvc(self):
+        self.cvc_visible = not self.cvc_visible
+    
+        if self.cvc_visible:
+            self.hide_all_widgets()
+            self.scrollable_frame.grid(row=0, column=3, padx=(20, 20), pady=(20, 20), rowspan=2, sticky="nsew")
+            self.scrollable_frame.grid_columnconfigure(0, weight=1)
+            self.button_send.grid(row=3, column=3, padx=(20, 20), pady=(20, 20), sticky="nsew")
+            self.slider_progressbar_frame.grid(row=1, column=1, padx=(20, 0), pady=(20, 0), sticky="nsew")
+        else:
+            self.hide_all_widgets()
+    
+        self.string_visible = False
+
+
+       
+        
+    def affiche_conf(self):
+        self.open_input_dialog()
+            
+    
+
+    
+    
+    def open_input_dialog(self):
+        # Crée une instance de la boîte de dialogue
+        dialog = InputDialog(self)
+        self.wait_window(dialog)
+
+
+                
+
+        if dialog.client_name:
+            client_name= dialog.client_name
+        
+        if dialog.trader_name:
+            trader_name= dialog.trader_name
+            
+        if dialog.trade_date:
+            trade_date = dialog.trade_date
+        
+        if dialog.trade_ref:
+            trader_ref = dialog.trade_ref
+            
+        if dialog.underlying:
+            underlying = dialog.underlying  
+            
+        if dialog.commission:
+            commission = dialog.commission
+            
+
+        return client_name , trader_name, trade_date, trader_ref, underlying , commission
+    
+
+
+    def convertir_prix(self,prix):
+        # Vérifie si le prix est un nombre flottant au format ".xy"
+        if re.match(r'^\.\d+$', prix):
+            return f"0{prix}"
+        return prix
+
+    
+    
+
+    def extraire_elements_lignes(self, entrees):
+        # Extraire la première ligne comme phrase et retirer la du reste des entrees
+        phrase = entrees[0]
+        entrees = entrees[1:]
+    
+        # Initialiser les listes pour chaque type d'élément
+        Indices = []
+        Dates = []
+        Strikes = []
+        Types = []
+        Pos = []
+        Tailles = []
+        Prix = []
+    
+        # Déterminer le facteur de multiplication basé sur la phrase
+        Facteur = 1 if "sold" in phrase.lower() else -1 if "bought" in phrase.lower() else 0
+        VIX = 1 if "VIX" in phrase else 0
+        EEM = 1 if "EEM" in phrase else 0
+        
+    
+        if (VIX == 1 and EEM == 0):
+            # Parcourir chaque ligne d'entrée
+            for entree in entrees:
+                # Utilisation d'une expression régulière pour extraire les éléments
+                match = re.match(r"(\w+)\s+([\d,]+)\s+VIX\s+(\w+-\d+-\d+)\s+([\d.]+)\s+(Call|Put)\s+([\d.]+)", entree.strip())
+    
+                if match:
+                    try:
+                        pos = match.group(1)  # Sold ou Bot
+                        taille = int(match.group(2).replace(",", ""))  # 1,000 => 1000
+                        indice = "VIX"
+                        date = match.group(3)  # Oct-16-24
+                        strike = match.group(4)  # 47.5
+                        type_abrege = "p" if match.group(5).lower() == "put" else "c"
+                        prix = self.convertir_prix(match.group(6))  # .40 ou 1.09
+    
+                        # Calcul de la taille corrigée
+                        taille_corrigee = taille * (1 if pos.lower() == "sold" else -1) * Facteur
+    
+                        # Ajouter aux listes respectives
+                        Indices.append(indice)
+                        Dates.append(date)
+                        Strikes.append(strike)
+                        Types.append(type_abrege)
+                        Pos.append(pos)
+                        Tailles.append(taille_corrigee)
+                        Prix.append(prix)
+                    
+                    except ValueError as e:
+                        print(f"Erreur de conversion pour la ligne: {entree} -> {e}")
+                else:
+                    print(f"Erreur : La ligne suivante ne contient pas le nombre attendu d'éléments : {entree}")
+            
+        elif (VIX == 0 and EEM == 0) and (entrees[1].split()[0].lower() in ["sold", "bot"]):
+            # Parcourir chaque ligne d'entrée
+            for entree in entrees:
+                elements = entree.split()
+                if len(elements) == 7:
+                    try:
+                        # Assigner les valeurs aux listes appropriées
+                        type_abrege = "p" if elements[5].lower() == "put" else "c" if elements[5].lower() == "call" else elements[5]
+                        taille_corrigee = int(elements[1].replace(",", "")) * (1 if elements[0].lower() == "sold" else -1) * Facteur
+                        Indices.append(elements[2])
+                        Dates.append(elements[3])
+                        Strikes.append(elements[4])
+                        Types.append(type_abrege)
+                        Pos.append(elements[0])
+                        Tailles.append(taille_corrigee)
+                        Prix.append(self.convertir_prix(elements[6]))
+                    
+                    except ValueError as e:
+                        print(f"Erreur de conversion pour la ligne: {entree} -> {e}")
+                else:
+                    print(f"Erreur : La ligne suivante ne contient pas le nombre attendu d'éléments : {entree}")
+                    
+      
+                            
+        elif (VIX == 0 and EEM == 0):
+            # Parcourir chaque ligne d'entrée
+            for entree in entrees:
+                elements = entree.split()
+                if len(elements) == 7:
+                    try:
+                        # Assigner les valeurs aux listes appropriées
+                        type_abrege = "p" if elements[3].lower() == "put" else "c" if elements[3].lower() == "call" else elements[3]
+                        taille_corrigee = int(elements[5].replace(",", "")) * (1 if elements[4].lower() == "sold" else -1) * Facteur
+                        Indices.append(elements[0])
+                        Dates.append(elements[1])
+                        Strikes.append(elements[2])
+                        Types.append(type_abrege)
+                        Pos.append(elements[4])
+                        Tailles.append(taille_corrigee)
+                        Prix.append(self.convertir_prix(elements[6]))
+                    
+                    except ValueError as e:
+                        print(f"Erreur de conversion pour la ligne: {entree} -> {e}")
+                else:
+                    print(f"Erreur : La ligne suivante ne contient pas le nombre attendu d'éléments : {entree}")
+           
+
+        return Indices, Dates, Strikes, Types, Pos, Tailles, Prix, Facteur
+
+    
+    
+    
+    def est_format_date_jjmmaa(self, date):
+        # Expression régulière pour vérifier le format 22Aug24
+        pattern = r'^\d{2}[A-Za-z]{3}\d{2}$'
+        return bool(re.match(pattern, date))
+
+    def convertir_date(self, date):
+        # Si la date est déjà au format JJMMAA (ex: 22Aug24), ne pas la convertir
+        if self.est_format_date_jjmmaa(date):
+            return date
+        # Si la date est au format MM-JJ-AAAA, la convertir
+        mois, jour, annee = date.split('-')
+        return f"{jour}{mois}{annee}"
+
+
+
+    def afficher_resultats(self,Tailles, Indices, Dates, Strikes, Types, Prix, Facteur):
+        # Créer une liste pour stocker les chaînes formatées
+        resultats = []
+
+        action = 'sell' if Facteur == 1 else 'buy'
+            
+        # Imprimer les résultats formatés
+        for i in range(len(Tailles)):
+            # Convertir la date au format désiré
+                date_convertie = self.convertir_date(Dates[i])
+                resultats.append(f"{Tailles[i]} {Indices[i]} {date_convertie} {Strikes[i]} {Types[i]} e @{Prix[i]}")
+        
+        
+        print(f"vantage sell [{ ' | '.join(resultats) }]")
+        sample_text = "vantage "+str(action)+f" [{ ' | '.join(resultats) }]"+" (order time/fill time)"
+        sample_text_pyperclip ="vantage "+str(action)+f" [{ ' | '.join(resultats) }]"+" (order time/fill time)"
+        
+        self.textboxoutput.insert("10.0", sample_text.lower())
+        pyperclip.copy(sample_text_pyperclip.lower())
+
+        
+
+
+    def transform(self):
+        
+        self.textboxoutput.delete("1.0", "end")
+        # Exemple d'utilisation avec plusieurs lignes
+        entrees = self.textbox.get("1.0", "end").strip().split("\n")
+     
+        # Extraire les éléments
+        Indices, Dates, Strikes, Types, Pos, Tailles, Prix, Facteur = self.extraire_elements_lignes(entrees)
+     
+        # Afficher les résultats sur une seule ligne
+        self.afficher_resultats(Tailles, Indices, Dates, Strikes, Types, Prix, Facteur)
+    
+
+    def sending(self):
+        
+        # Initialisation d'Outlook
+        outlook = win32.Dispatch('outlook.application')
+        
+        # Créer un nouvel élément de mail
+        mail = outlook.CreateItem(0)
+
+        # Définir les paramètres de l'e-mail
+        mail.Subject = self.cvc_entry.get()
+        mail.Body = textmail
+        
+        
+        to_emails = []
+        
+        if self.switchiNOMURA.get() == 1:
+            to_emails.extend(nomura_emails)
+        if self.switchiHSBC.get() == 1:
+            to_emails.extend(hsbc_emails)
+        if self.switchiBNP.get() == 1:
+            to_emails.extend(bnp_emails)
+        if self.switchiCITI.get() == 1:
+            to_emails.extend(citi_emails)
+        if self.switchiMEDIO.get() == 1:
+            to_emails.extend(medio_emails)
+        if self.switchiBARCLAYS.get() == 1:
+            to_emails.extend(barclays_emails)
+        if self.switchiGS.get() == 1:
+            to_emails.extend(gs_emails)
+        if self.switchiML.get() == 1:
+            to_emails.extend(ml_emails)
+        if self.switchiJPM.get() == 1:
+            to_emails.extend(jpm_emails)
+        if self.switchiUBS.get() == 1:
+            to_emails.extend(ubs_emails)
+        if self.switchiRBC.get() == 1:
+            to_emails.extend(rbc_emails)
+        if self.switchiCIBC.get() == 1:
+            to_emails.extend(cibc_emails)
+        if self.switchiUNICREDIT.get() == 1:
+            to_emails.extend(unicredit_emails)
+        if self.switchiMS.get() == 1:
+            to_emails.extend(ms_emails)
+        
+        mail.Bcc = '; '.join(to_emails)
+
+        mail.CC = ""
+        
+    
+
+        mail.Display()
+
+
+    def calcul(self):
+        cvc_entry = self.cvc_entry.get()
+        
+        global textmail
+        
+        if cvc_entry:
+
+            parts = cvc_entry.split()
+
+            
+            if len(parts) >= 6:
+                # Affecter chaque partie aux variables a, b, c, d, e, f, h, g
+                expiration = parts[0]
+                pairedevise = parts[1]
+                taux = parts[2]
+                typedetrade = parts[3]
+                qEur = parts[4]
+                pairetaux = parts[5]
+ 
+                qEur = qEur.replace("q","")
+                
+                listedevise = pairedevise.split('/')
+                leg1 = listedevise[0]
+                leg2 = listedevise[1]
+                
+                listetaux = pairetaux.split('/')
+                leg1taux = listetaux[0]+"%"
+                leg2taux = listetaux[1]
+                
+                
+                if taux == "ATM":
+                    taux = "100%"
+                
+                
+                if typedetrade == "CVC":
+                    self.seg_button_1.set("Call v Call")
+                    
+                elif typedetrade == "PVP": 
+                    self.seg_button_1.set("Put v Put")
+                
+                
+                if typedetrade == "CVC" or typedetrade =="CvC":
+                    typedetrade = "Call vs Call"
+                    
+                else: 
+                    typedetrade = "Put vs Put"
+                
+                
+                
+                date_obj = datetime.strptime(expiration, "%d%b%y")
+                new_format_date = date_obj.strftime("%d%m%Y")
+                expiration = new_format_date
+
+                
+                L1 = "[ProductType]              ["+str(typedetrade)+"]"
+                L2 = "[Expiry]                            ["+str(expiration)+"]"
+                L3 = "[TotalLegs]                    ["+"2"+"]"
+                L4 = "[Leg1]                              ["+str(leg1)+"]"
+                L5 = "[Leg2]                              ["+str(leg2)+"]"
+                L6 = "[QuantoCurrency]     ["+str(qEur)+"]"
+                L7 = "[Strike]                            ["+str(taux)+"]"
+                L8 = "[Bid]                                 ["+str(leg1taux)+"]"
+                L9 = "[Ask]                                ["+str(leg2taux)+"]"
+
+                textmail = str(L1)+"\n"+str(L2)+"\n"+str(L3)+"\n"+str(L4)+"\n"+str(L5)+"\n"+str(L6)+"\n"+str(L7)+"\n"+str(L8)+"\n"+str(L9)
+
+
+                print(textmail)
+
+                self.sending()
+
+            else:
+                print("Le texte ne contient pas assez d'éléments pour affecter toutes les variables.")
+                        
+        
+        else:
+            message = "Veuillez entrer les détails de la transaction"
+            tkinter.messagebox.showinfo("Focus Harry", message)
+
+
+
+
+    def about(self):
+        self.create_pdf()
+        
+    def infos(self):
+        message = "      "
+        tkinter.messagebox.showinfo("Contact", message)
+        
+    def open_input_dialog_event(self):
+        dialog = customtkinter.CTkInputDialog(text="Type in a number:", title="CTkInputDialog")
+        print("CTkInputDialog:", dialog.get_input())
+
+    def change_appearance_mode_event(self, new_appearance_mode: str):
+        customtkinter.set_appearance_mode(new_appearance_mode)
+
+    def change_scaling_event(self, new_scaling: str):
+        new_scaling_float = int(new_scaling.replace("%", "")) / 100
+        customtkinter.set_widget_scaling(new_scaling_float)
+
+    def sidebar_button_event(self):
+        print("sidebar_button click")
+        
+        
+    def create_pdf(self):
+        
+        entrees = self.textbox.get("1.0", "end").strip().split("\n")
+        Indices, Dates, Strikes, Types, Pos, Tailles, Prix, Facteur = self.extraire_elements_lignes(entrees) 
+        print (Indices [0])
+
+        client_name , trader_name, trade_date, trader_ref, underlying , commission = self.open_input_dialog()
+        
+        c = canvas.Canvas("C:/Users/Garbiel Mure/Downloads "+"test.pdf", pagesize=letter)
+        width, height = letter
+        c.drawImage("C:/Users/Garbiel Mure/Downloads/Capture.PNG", 30, height - 110, width=550, height=74)  # Add this line to draw the image
+        c.setFont("Helvetica-Bold", 16)
+        c.setFont("Helvetica", 18)
+        c.drawString(235, height - 130, "Trade Confirmation")
+        
+           
+        
+           
+           
+           
+        c.setFont("Helvetica-Bold", 9)
+        
+        c.drawString(30, height - 170, "Client Name  ")
+        c.drawString(30, height - 190, "Trader's Name ")
+        c.drawString(30, height - 210, "Trade Ref ")
+        c.drawString(30, height - 230, "Trade Date ")
+        c.drawString(30, height - 250, "Underlying  ")
+        c.drawString(30, height - 285, "Options Strikes  ")
+        
+        c.setLineWidth(1)
+        c.line(25, height - 255, 580, height - 255) 
+        c.setLineWidth(1)
+        c.line(25, height - 160, 580, height - 160) 
+        
+        c.drawString(30, height - 500, "Comission  ") 
+        
+        
+        
+        
+        c.setFont("Helvetica", 9)
+        
+        c.drawString(100, height - 170, str(client_name))
+        c.drawString(100, height - 190, str(trader_name))
+        c.drawString(100, height - 210, str(trade_date))
+        c.drawString(100, height - 230, str(trader_ref))
+        c.drawString(100, height - 250, str(underlying))
+        
+        
+        
+        #OptionsStrikes Values
+        
+        
+        y_position = height - 305
+        line_spacing = 15 
+        
+        for i in range (len(Pos)):
+            
+            if Pos[i]== "Sold":
+                Pos[i] = "Sell"
+            else:
+                Pos[i] = "Buy"
+           
+                
+        for i in range (len(Types)):
+            
+            if Types[i]== "p":
+                Types[i] = "European PUT"
+            else:
+                Types[i] = "European CALL"
+          
+         
+        print(Dates[0])
+         
+        for j in range (len(Dates)):
+            
+            
+            try:
+                date_str = Dates[j]
+                
+                date_obj = datetime.strptime(date_str, '%b-%d-%y')
+    
+                Dates[j] = date_obj.strftime('%b(%d/%m/%Y)')
+                
+            except ValueError:
+                
+                try: 
+                    date_str = Dates[j]
+                    date_obj = datetime.strptime(date_str, '%d%b%y')
+                    Dates[j] = date_obj.strftime('%b(%d/%m/%Y)')
+               
+                except ValueError:
+                    # Si aucun des formats ne correspond
+                    return f'Invalid date format: {date_str}'
+                    
+            
+        
+        
+        for k in range (len(Tailles)):
+            
+            Tailles[k] = abs(Tailles[k])
+            
+        
+        for i in range (len(Indices)):
+            
+            c.drawString(30, y_position, str(Indices[i]))
+
+            c.drawString(90, y_position, str(Pos[i]))
+            
+            c.drawString(140, y_position, str(Tailles[i]))
+            
+            c.drawString(190, y_position, str(Types[i]))
+            
+            c.drawString(280, y_position, str(Dates[i]))
+            
+            c.drawString(380, y_position, str(Strikes[i]))
+            
+            c.drawString(420, y_position, "@")
+            
+            c.drawString(450, y_position, str(Prix[i]))
+            
+            
+        
+        
+        
+        
+            y_position -= line_spacing 
+        
+        print (Indices, Dates, Strikes, Types, Pos, Tailles, Prix, Facteur)
+        
+        
+        c.drawString(103, height - 500, str(commission))
+        c.drawString(80, height - 500, "USD  ")
+        c.drawString(30, height - 530, "If you have any questions please do not hesitate to call.  ")
+        c.drawString(30, height - 550, "Regards,  ")
+        c.drawString(30, height - 570, "Sim Aujla")
+        c.drawString(30, height - 580, "Index D1")
+        c.setFont("Helvetica",7)
+        c.drawString(30, height - 600, "LEI: 2138007ZHUXSGBB53N72")
+        
+        c.drawString(290, height - 690, "DISCLAIMER")   
+        
+        
+        
+        
+        
+        
+        
+           
+           
+        c.setFillColor(HexColor(0x800000))   
+        styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(name='Justify', alignment=1, fontSize=7, textColor=colors.black))
+        text = (                                                                
+                "All transactions are subject to individual fax and documentation exchange between the parties involved. Please note that our function is limited to introducing"
+                "potential parties to each other and that we are not responsible and do not hold ourselves responsible for the financial condition of any party we introduce to"
+                "you nor for its performance of any transaction or other agreement it may enter into with you as a result of our introduction. Please telephone us immediately"
+                "should the particulars of this confirmation not be in accordance with your understanding, otherwise we will assume that all trade details set out above are "
+                "correct as stated."
+        )
+           
+        c.translate(10, 40)  # Adjust these values for your specific layout
+        p = Paragraph(text, styles['Justify'])
+        p.wrapOn(c, 500, 200)  # Adjust the second parameter for your width
+        p.drawOn(c, 30, 0)
+           
+         
+           
+           
+           
+        c.showPage()
+        c.save()
+
+if __name__ == "__main__":
+    app = App()
+    app.mainloop()
